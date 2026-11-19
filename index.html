@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1b2a6b">
+<meta name="mobile-web-app-capable" content="yes">
+<title>반짝이의 크리스마스 선물</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="fonts/jua.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <!-- 배경 -->
+  <div id="bgWrap"><div id="bgA" class="bg"></div><div id="bgB" class="bg"></div><div id="bgShade"></div></div>
+  <!-- 지도·지구본 -->
+  <svg id="map" class="hidden" aria-hidden="true"></svg>
+  <!-- 사진·스티커 무대 -->
+  <div id="stage"></div>
+  <!-- 눈·반짝이 효과 -->
+  <canvas id="fx"></canvas>
+  <!-- 반짝이 -->
+  <div id="elfWrap"><img id="elfImg" alt=""><img id="elfImg2" alt=""></div>
+  <!-- 말풍선 -->
+  <div id="bubble"><span id="bubbleText"></span></div>
+  <!-- 진행 힌트 -->
+  <div id="tapHint">화면을 눌러 주세요 ▶</div>
+
+  <!-- 상단 도구 -->
+  <div id="tools">
+    <button id="autoBtn" class="tool" aria-label="자동 넘김">▶ 자동</button>
+    <button id="soundBtn" class="tool round" aria-label="소리">🔊</button>
+    <button id="fsBtn" class="tool round" aria-label="전체 화면">⛶</button>
+  </div>
+  <button id="gearBtn" aria-label="부모 메뉴 (길게 누르기)">⚙</button>
+  <div id="ver"></div>
+
+  <!-- 시작 화면 -->
+  <div id="startLayer" class="layer hidden">
+    <div class="startCard">
+      <img src="assets/elf/wave.webp" class="startElf" alt="">
+      <h1 id="startTitle"></h1>
+      <button id="startBtn" class="bigbtn">✨ 반짝이 부르기</button>
+    </div>
+  </div>
+
+  <!-- 처음 설정 (부모용) -->
+  <div id="setupLayer" class="layer hidden">
+    <div class="panel">
+      <h2>처음 설정 <small>(부모님용)</small></h2>
+      <p class="note">입력한 이름·생일·사진은 이 태블릿 안에만 저장됩니다.</p>
+      <label>아이 이름 <input id="inName" type="text" placeholder="예: 하윤" maxlength="10"></label>
+      <label>생일 <input id="inBirth" type="date"></label>
+      <label class="filelabel">사진 압축 파일(ZIP) — 여러 개 선택 가능 <input id="inZip" type="file" accept=".zip,application/zip" multiple></label>
+      <div id="progress" class="hidden"><div id="progBar"></div><span id="progText"></span></div>
+      <div id="importReport"></div>
+      <div class="row">
+        <button id="saveBtn" class="bigbtn small">저장하고 시작하기</button>
+        <button id="cancelSetup" class="ghost hidden">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 부모 메뉴 -->
+  <div id="parentLayer" class="layer hidden">
+    <div class="panel">
+      <h2>부모 메뉴</h2>
+      <div id="libSummary" class="note"></div>
+      <div class="col">
+        <button id="pmSetup" class="bigbtn small">사진·이름·생일 다시 설정</button>
+        <button id="pmRestart" class="bigbtn small">처음부터 다시 보기</button>
+        <button id="pmJump" class="bigbtn small">여행 장면부터 보기</button>
+        <button id="pmClose" class="ghost">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/d3-array.min.js"></script>
+<script src="vendor/d3-geo.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
+<script src="vendor/gsap.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

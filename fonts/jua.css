@@ -1,0 +1,15 @@
+/* jua-korean-400-normal */
+@font-face {
+  font-family: 'Jua';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(../fonts/jua-korean-400-normal.woff2) format('woff2');
+}/* jua-latin-400-normal */
+@font-face {
+  font-family: 'Jua';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(../fonts/jua-latin-400-normal.woff2) format('woff2');
+}
