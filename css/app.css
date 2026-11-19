@@ -137,3 +137,63 @@ html,body{height:100%;overflow:hidden;background:#0f1640;
   .titleCard .ribbon{font-size:6vw;padding:2vh 5vw}
   .titleCard .sub{font-size:4vw}
 }
+
+#fx{position:absolute;inset:0;pointer-events:none;z-index:5}
+#map{z-index:1}
+#stage{z-index:2}
+/* 오린 하윤이 사진 */
+.kidCut{position:absolute;animation:bob 3s ease-in-out infinite}
+.kidCut img{width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 0 .35vh #fff) drop-shadow(0 0 .35vh #fff) drop-shadow(0 0 .35vh #fff) drop-shadow(0 1.6vh 2vh rgba(0,0,0,.35))}
+/* 뒤로 가기 */
+.backBtn{position:absolute;top:2vh;left:10vh;z-index:9;font-family:inherit;font-size:3.2vh;padding:1.2vh 3.2vh;border:none;border-radius:99px;
+  background:var(--cream);color:var(--ink);box-shadow:0 .6vh 0 #d8c3a0,0 1.2vh 2.4vh rgba(0,0,0,.3);pointer-events:auto}
+.backBtn:active{transform:translateY(.5vh);box-shadow:0 .1vh 0 #d8c3a0}
+/* 추억 상자 */
+.hub{position:absolute;left:22vw;right:2vw;top:8vh;bottom:20vh;display:flex;gap:2.4vw;align-items:center;justify-content:center;flex-wrap:wrap}
+.hubCard{position:relative;flex:1 1 0;max-width:34vh;min-width:16vh;background:var(--cream);border-radius:2.6vh;padding:1.4vh;
+  box-shadow:0 1vh 0 #d8c3a0,0 2vh 4vh rgba(0,0,0,.35);text-align:center;pointer-events:auto;cursor:pointer;transition:transform .15s}
+.hubCard:active{transform:scale(.95)}
+.hubPic{position:relative;width:100%;aspect-ratio:3/4;border-radius:1.8vh;background:#28356f center/cover;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;font-size:10vh}
+.hubPic.hubMap{background:radial-gradient(circle at 50% 40%,#d9eef3,#a9cfe0)}
+.hubPol{width:70%;aspect-ratio:1;background:#fff;padding:.8vh .8vh 3vh;transform:rotate(-4deg);box-shadow:0 1vh 2vh rgba(0,0,0,.35)}
+.hubPol img{width:100%;height:100%;object-fit:cover;display:block}
+.hubTrip{position:absolute;width:42%;filter:drop-shadow(0 .5vh .8vh rgba(0,0,0,.25))}
+.hubElf{height:90%;object-fit:contain;filter:drop-shadow(0 0 .4vh #fff)}
+.hubTitle{font-size:2.8vh;margin-top:1vh;color:var(--ink);line-height:1.25;word-break:keep-all;min-height:2.6em;display:flex;align-items:center;justify-content:center}
+.hubStar{position:absolute;top:-2vh;right:-1.4vh;font-size:5vh;filter:drop-shadow(0 .4vh .4vh rgba(0,0,0,.3))}
+.newBadge,.chipNew{position:absolute;top:-1.6vh;left:-1.2vh;background:#e0574a;color:#fff;font-size:2.2vh;padding:.3vh 1.4vh;border-radius:99px;box-shadow:0 .4vh 0 #a8342b}
+/* 사진첩 */
+.albumTitle{position:absolute;top:2.2vh;left:50%;transform:translateX(-50%);font-size:4.2vh;color:#fff;background:linear-gradient(180deg,#f07467,#d9473b);
+  padding:1vh 4vh;border-radius:1.4vh;box-shadow:0 .7vh 0 #a8342b;white-space:nowrap}
+.albumGrid{position:absolute;left:22vw;right:3vw;top:12vh;bottom:12vh;display:grid;gap:2.2vh;align-content:center;justify-items:center}
+.thumb{background:#fffdf8;padding:1vh 1vh 3.4vh;border-radius:.6vh;transform:rotate(var(--r));
+  box-shadow:0 1vh 2vh rgba(40,25,10,.35);pointer-events:auto;cursor:pointer;max-height:100%}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;border-radius:.3vh}
+.thumb:active{transform:rotate(var(--r)) scale(.94)}
+.pager{position:absolute;bottom:2.4vh;right:4vw;display:flex;align-items:center;gap:2vh;pointer-events:auto}
+.pgBtn{font-family:inherit;width:8vh;height:8vh;border-radius:50%;border:none;font-size:3.4vh;background:var(--cream);color:var(--ink);box-shadow:0 .6vh 0 #d8c3a0}
+.pgBtn:disabled{opacity:.35}
+.pgInfo{font-size:3vh;color:#fff;text-shadow:0 .2vh .6vh rgba(0,0,0,.6)}
+.zoomWrap{position:absolute;inset:0;z-index:8;background:rgba(15,15,35,.62);display:flex;align-items:center;justify-content:center;pointer-events:auto}
+.zoomBox{position:relative}
+.zoomClose{position:absolute;top:12vh;right:3vw;width:8vh;height:8vh;border-radius:50%;border:none;font-size:4vh;background:var(--cream);color:var(--ink)}
+.zoomNav{position:absolute;top:50%;transform:translateY(-50%);width:10vh;height:10vh;border-radius:50%;border:none;font-size:4.4vh;background:rgba(255,250,240,.92);color:var(--ink);box-shadow:0 .8vh 2vh rgba(0,0,0,.3)}
+.zoomNav.left{left:2vw}.zoomNav.right{right:2vw}
+/* 지도 옆 버튼 */
+.mapSide{position:absolute;right:3vw;bottom:4vh;display:flex;flex-direction:column;gap:1.6vh;align-items:flex-end;pointer-events:auto}
+.chip{position:relative;font-family:inherit;font-size:3vh;padding:1.2vh 3vh;border:none;border-radius:99px;background:var(--cream);color:var(--ink);
+  box-shadow:0 .6vh 0 #d8c3a0,0 1.2vh 2.4vh rgba(0,0,0,.3);display:flex;align-items:center;gap:1vh}
+.chip.big{font-size:3.8vh;padding:1.6vh 4vh}
+.chip img{width:7vh;height:7vh}
+.yearPick{position:absolute;left:24vw;right:4vw;top:10vh;bottom:22vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4vh}
+.yearArt{width:28vh;filter:drop-shadow(0 0 .5vh #fff) drop-shadow(0 1vh 2vh rgba(0,0,0,.3))}
+.yearRow{display:flex;gap:3vh;flex-wrap:wrap;justify-content:center}
+.yearChip{position:relative;font-family:inherit;font-size:5vh;padding:2vh 5vh;border:none;border-radius:2.4vh;color:#fff;
+  background:linear-gradient(180deg,#7fb3e6,#4c84c4);box-shadow:0 .9vh 0 #335f93,0 1.6vh 3vh rgba(0,0,0,.3);pointer-events:auto}
+.yearChip:active{transform:translateY(.7vh);box-shadow:0 .2vh 0 #335f93}
+@media (orientation:portrait){
+  .hub,.albumGrid,.yearPick{left:4vw;right:4vw;top:12vh;bottom:30vh}
+  .hubCard{flex:0 0 40vw;max-width:none}
+}

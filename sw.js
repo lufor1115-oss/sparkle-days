@@ -1,5 +1,5 @@
 /* 오프라인 실행용 캐시 — 앱 파일만 저장합니다 (사진은 IndexedDB) */
-const CACHE = 'sparkle-v1.0.0';
+const CACHE = 'sparkle-v1.1.0';
 const FILES = [
   "./",
   "assets/bg/ch1.jpg",
@@ -37,7 +37,11 @@ const FILES = [
 ];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+// 인터넷이 되면 항상 최신 파일, 안 되면 저장해 둔 파일
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(r => r || fetch(e.request)));
+  if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
+  e.respondWith(fetch(e.request).then(r => {
+    if (r && r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
+    return r;
+  }).catch(() => caches.match(e.request, { ignoreSearch: true })));
 });
