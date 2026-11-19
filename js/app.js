@@ -4,7 +4,7 @@
    - 이 코드에는 개인 정보가 들어 있지 않습니다.
    ============================================================= */
 'use strict';
-const VERSION = 'v1.1.1';
+const VERSION = 'v1.2.0';
 const QS = new URLSearchParams(location.search);
 const SPEED = Math.max(0.1, +QS.get('speed') || 1);   // 검사용 배속
 
@@ -59,12 +59,22 @@ const L = {
   h02:'또 어디 볼까?',
   a01:'보고 싶은 사진을 눌러 봐! 크게 보여 줄게.',
   newp:'이번에는 {장소}에 다녀왔구나?',
+  go1:'나도 같이 갈래! {장소}로 출발~',
+  go2:'와, 저기 {장소}가 보여!',
   e01:'{이름}이랑 함께한 시간을 돌아보니 정말 행복하다!',
-  e02:'크리스마스 요정은 착한 아이를 스스로 찾아온단다.',
-  e03:'나는 {이름}이가 엄마 아빠랑 함께 있을 때만 나타날 수 있어.',
-  e04:'다음에 또 보고 싶으면 엄마 아빠한테 살짝 말해 줘. 그럼 내가 또 올게!',
-  e05:'메리 크리스마스, {이름}아!'
+  e02:'이제 나는 눈꽃 나라로 돌아가야 해…',
+  e03:'크리스마스 요정은 착한 아이를 스스로 찾아온단다.',
+  e04:'하지만 걱정 마! {이름}이가 엄마 아빠랑 함께 있을 때면 또 나타날 수 있어.',
+  e05:'다음에 또 보고 싶으면 엄마 아빠한테 살짝 말해 줘. 그럼 내가 또 올게!',
+  e06:'메리 크리스마스, {이름}아!'
 };
+/* 대사마다 하윤이 표정 (표정 폴더의 파일 이름) */
+const KID = { p01:'놀람', p02:'기쁨', p03:'기쁨', p04:'놀람', p05:'놀람', p06:'기쁨', c1:'기쁨', c2:'기쁨', c3:'신남', cN:'기쁨',
+  g01:'놀람', g02:'신남', r01:'기쁨', r02:'기쁨', r03:'기쁨', r04:'신남', r05:'신남', t03:'놀람', t04:'기쁨', y01:'기쁨', place:'신남',
+  h01:'기쁨', h02:'기쁨', a01:'기쁨', newp:'놀람', memo:'기쁨', go1:'신남', go2:'놀람',
+  e01:'기쁨', e02:'슬픔', e03:'슬픔', e04:'기쁨', e05:'기쁨', e06:'신남' };
+const EXPR_ALIASES = { 기쁨:['기쁨','웃음','미소','기본','신남'], 놀람:['놀람','기쁨','웃음','미소','기본'], 슬픔:['슬픔','아쉬움','속상','시무룩'], 신남:['신남','기쁨','웃음','미소','기본'] };
+const WALK_NAMES = ['걷기', '뒷모습', '걷는'];
 const RANDOM_LINES = ['r01','r02','r03','r04','r05'];
 
 /* =============================================================
@@ -80,11 +90,14 @@ function josa(word, a, b) { // 받침 여부로 조사 선택 (아/야 등)
   if (c < 0xAC00 || c > 0xD7A3) return word + b;
   return word + (((c - 0xAC00) % 28) ? a : b);
 }
+function roJosa(w) { const c = w.charCodeAt(w.length - 1); if (c < 0xAC00 || c > 0xD7A3) return w + '로'; const j = (c - 0xAC00) % 28; return w + (j === 0 || j === 8 ? '로' : '으로'); }
 function fillText(t, vars = {}) {
   const n = S.settings ? S.settings.name : '';
   return t.replace(/\{이름\}아/g, josa(n, '아', '야'))
           .replace(/\{이름\}이/g, josa(n, '이', ''))
           .replace(/\{이름\}/g, n)
+          .replace(/\{장소\}로/g, vars.place ? roJosa(vars.place) : '')
+          .replace(/\{장소\}가/g, vars.place ? josa(vars.place, '이', '가') : '')
           .replace(/\{장소\}/g, vars.place || '');
 }
 
@@ -339,20 +352,22 @@ function setBg(name, shade = '') {
   const cur = bgFlip ? $('bgB') : $('bgA'), nxt = bgFlip ? $('bgA') : $('bgB'); bgFlip = !bgFlip;
   nxt.style.backgroundImage = name ? `url(assets/bg/${name}.jpg)` : 'none';
   if (bgTween) bgTween.kill();
-  gsap.set(nxt, { scale: 1, x: 0 });
-  bgTween = gsap.to(nxt, { scale: 1.07, x: rand(-12, 12), duration: 24, ease: 'sine.inOut', yoyo: true, repeat: -1 });
+  gsap.killTweensOf(nxt);
+  gsap.fromTo(nxt, { scale: 1.18, x: 0, y: '2vh' }, { scale: 1, y: 0, duration: 1.8 / SPEED, ease: 'power2.out', onComplete: () => {
+    bgTween = gsap.to(nxt, { scale: 1.06, x: rand(-12, 12), duration: 24, ease: 'sine.inOut', yoyo: true, repeat: -1 }); } });
   nxt.classList.add('on'); cur.classList.remove('on');
   $('bgShade').className = shade;
 }
-
 /* =============================================================
    눈·반짝이 효과 (캔버스)
    ============================================================= */
 const FX = {
-  c: null, g: null, flakes: [], sparks: [], snow: 0,
+  c: null, g: null, flakes: [], near: [], sparks: [], snow: 0,
+  newNear(any) { return { x: rand(0, innerWidth), y: any ? rand(0, innerHeight) : -40, r: rand(7, 15), vy: rand(1.6, 2.8), ph: rand(0, 6.28), o: rand(.18, .35) }; },
   init() {
     this.c = $('fx'); this.g = this.c.getContext('2d'); this.resize(); addEventListener('resize', () => this.resize());
     for (let i = 0; i < 140; i++) this.flakes.push(this.newFlake(true));
+    for (let i = 0; i < 16; i++) this.near.push(this.newNear(true));
     const loop = () => { this.draw(); requestAnimationFrame(loop); }; requestAnimationFrame(loop);
   },
   resize() { const d = Math.min(devicePixelRatio || 1, 2); this.c.width = innerWidth * d; this.c.height = innerHeight * d; this.c.style.width = '100%'; this.c.style.height = '100%'; this.g.setTransform(d, 0, 0, d, 0, 0); },
@@ -370,6 +385,13 @@ const FX = {
       const f = this.flakes[i]; f.y += f.vy; f.ph += 0.01; f.x += Math.sin(f.ph) * 0.4;
       if (f.y > innerHeight + 10) Object.assign(f, this.newFlake(false));
       g.globalAlpha = f.o; g.beginPath(); g.arc(f.x, f.y, f.r, 0, 6.283); g.fill();
+    }
+    const nc = Math.floor(this.near.length * this.snow);
+    for (let i = 0; i < nc; i++) { // 화면 가까이 지나가는 흐린 눈송이 (깊이감)
+      const f = this.near[i]; f.y += f.vy; f.ph += .012; f.x += Math.sin(f.ph) * .9;
+      if (f.y > innerHeight + 40) Object.assign(f, this.newNear(false));
+      const gr = g.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r); gr.addColorStop(0, `rgba(255,255,255,${f.o})`); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.globalAlpha = 1; g.fillStyle = gr; g.beginPath(); g.arc(f.x, f.y, f.r, 0, 6.283); g.fill();
     }
     for (let i = this.sparks.length - 1; i >= 0; i--) {
       const s = this.sparks[i]; s.x += s.vx; s.y += s.vy; s.vy += 0.06; s.vx *= 0.98; s.life -= 0.018;
@@ -433,12 +455,40 @@ const Elf = {
 };
 
 /* =============================================================
+   하윤이 얼굴 — 대화창 옆에 고정, 대사마다 표정이 바뀜
+   ============================================================= */
+const Portrait = {
+  cur: null,
+  resolve(expr) {
+    const ex = (S.lib && S.lib.expressions) || {}, cut = n => !!(S.lib.cutouts && S.lib.cutouts[n]);
+    for (const n of (EXPR_ALIASES[expr] || [expr])) if (ex[n]) return { key: ex[n], cut: cut(n), sub: false };
+    if (expr === '슬픔') { const r = this.resolve('기쁨'); if (r) return { ...r, sub: true }; }
+    const any = Object.keys(ex).find(n => !WALK_NAMES.includes(n));
+    return any ? { key: ex[any], cut: cut(any), sub: false } : null;
+  },
+  async show(expr) {
+    const box = $('portrait'), r = this.resolve(expr);
+    if (!r) { box.classList.remove('on'); return; }
+    box.classList.toggle('cut', r.cut); box.classList.toggle('sad', r.sub);
+    const wasOn = box.classList.contains('on'); box.classList.add('on');
+    const id = r.key + (r.sub ? 's' : '');
+    if (this.cur === id) return; this.cur = id;
+    const a = $('pA'), b = $('pB'), on = a.classList.contains('on') ? a : b, off = on === a ? b : a;
+    off.src = await blobUrl(r.key); off.classList.add('on'); on.classList.remove('on');
+    gsap.fromTo(box, { y: wasOn ? '1.6vh' : '8vh', scale: wasOn ? .95 : .8 }, { y: 0, scale: 1, duration: .45 / SPEED, ease: 'back.out(2.6)' });
+  },
+  hide() { $('portrait').classList.remove('on'); }
+};
+
+/* =============================================================
    말풍선
    ============================================================= */
 let typing = null;
 async function say(id, opts = {}) {
   const text = fillText(opts.text || L[id] || '', opts.vars);
   if (opts.pose) Elf.setPose(opts.pose);
+  asideToken++;
+  const kx = opts.kid === undefined ? KID[id] : opts.kid; if (kx) Portrait.show(kx); else Portrait.hide();
   const b = $('bubble'), bt = $('bubbleText'); bt.textContent = ''; b.classList.add('on');
   if (opts.button) { /* 버튼 붙이기는 아래 */ }
   // 한 글자씩
@@ -460,9 +510,9 @@ async function say(id, opts = {}) {
   } else if (!opts.noWait) {
     await beat(hasVoice ? 900 : minRead);
   }
-  if (!opts.keep) b.classList.remove('on');
+  if (!opts.keep) { b.classList.remove('on'); Portrait.hide(); }
 }
-function hideBubble() { $('bubble').classList.remove('on'); }
+function hideBubble() { $('bubble').classList.remove('on'); Portrait.hide(); }
 
 /* =============================================================
    무대 도우미
@@ -534,20 +584,26 @@ const MapView = {
     </defs>`;
   },
   show() { this.svg = $('map'); this.svg.classList.remove('hidden'); gsap.fromTo(this.svg, { opacity: 0 }, { opacity: 1, duration: .8 }); },
-  hide() { return new Promise(r => gsap.to('#map', { opacity: 0, duration: .6, onComplete: () => { $('map').classList.add('hidden'); r(); } })); },
-  korea(places) {
+  hide() { return new Promise(r => gsap.to('#map', { opacity: 0, duration: .6, onComplete: () => { $('map').classList.add('hidden'); gsap.set('#map', { clearProps: 'transform' }); r(); } })); },
+  korea(places, withDots = false) {
     const W = innerWidth, H = innerHeight;
     const kr = this.krGeo.features.find(f => f.properties.name === 'South Korea');
     const box = { type: 'Feature', geometry: { type: 'MultiPoint', coordinates: [[124.6, 33.0], [131.0, 38.7], ...places.map(p => p.ll)] } };
-    this.proj = d3.geoMercator().fitExtent([[W * 0.30, H * 0.08], [W * 0.70, H * 0.92]], box);
+    this.proj = d3.geoMercator().fitExtent([[W * 0.26, H * 0.04], [W * 0.74, H * 0.96]], box);
     const path = d3.geoPath(this.proj);
-    let s = this.defs() + `<rect width="100%" height="100%" fill="url(#sea)"/><rect width="100%" height="100%" filter="url(#paper)"/>`;
+    // 기울였을 때 가장자리가 보이지 않도록 바다를 화면보다 넓게
+    let s = this.defs() + `<rect x="${-W}" y="${-H * .3}" width="${W * 3}" height="${H * 1.6}" fill="#c3e2ec"/><rect x="${-W}" y="${-H * .3}" width="${W * 3}" height="${H * 1.6}" filter="url(#paper)"/>`;
     s += `<g filter="url(#wc)">`;
     for (const f of this.krGeo.features) {
       const me = f === kr;
       s += `<path d="${path(f)}" fill="${me ? '#cfe3a8' : '#ebe2cf'}" stroke="${me ? '#8fae6a' : '#cfc2a8'}" stroke-width="${me ? 3 : 1.5}" opacity="${me ? 1 : .8}"/>`;
     }
     s += `</g>`;
+    if (withDots) {
+      places.forEach((pl, i) => { const q = this.proj(pl.ll); s += `<circle data-dot="${i}" cx="${q[0]}" cy="${q[1]}" r="2" fill="none"/>`; });
+      const hq = this.proj(PLACES[HOME]); s += `<circle data-dot="home" cx="${hq[0]}" cy="${hq[1]}" r="2" fill="none"/>`;
+      places.forEach(pl => pl.p = this.proj(pl.ll));
+    }
     this.svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     this.svg.innerHTML = s;
     return path;
@@ -604,24 +660,19 @@ async function prologue() {
   clearStage(); setBg('night'); FX.snow = 1;
   Elf.place(-0.3, 0.12); Elf.setPose('fly'); Elf.show();
   await pause(800);
-  await Elf.fly(0.62, 0.16, { dur: 3.6, end: 'wave' });
+  await Elf.fly(0.40, 0.18, { dur: 3.6, end: 'wave' });
   await say('p01', { pose: 'wave' });
   await say('p02', { pose: 'wave' });
-  const kid = await kidSticker(['웃음', '기본', '미소'], { size: 30, fx: .5, fy: .5 });
-  await pause(900);
   await say('p03', { pose: 'point' });
   await say('p04', { pose: 'think', noWait: true, keep: true });
-  hideBubble();
-  const stopOrbit = Elf.orbit(innerWidth * .5, innerHeight * .5, 26 * VH(), 18 * VH());
+  hideBubble(); Portrait.show('놀람');
+  const stopOrbit = Elf.orbit(innerWidth * .5, innerHeight * .34, 40 * VH(), 13 * VH(), 6);
   await countUp();
   stopOrbit();
-  await Elf.fly(0.62, 0.3, { dur: 1.8, end: 'surprise' });
-  const cutOf = n => !!(S.lib.cutouts && S.lib.cutouts[n]);
-  if (kid) { const img = kid.querySelector('img'); const sur = S.lib.expressions['놀람']; if (sur && cutOf('놀람') === kid.classList.contains('kidCut')) { img.src = await blobUrl(sur); gsap.fromTo(kid, { scale: .9 }, { scale: 1, duration: .5, ease: 'back.out(3)' }); } }
-  // (놀람 사진이 오린 사진이 아니면 원형 그대로 둠)
+  await Elf.fly(0.40, 0.42, { dur: 1.6, end: 'surprise' });
   await say('p05', { pose: 'surprise' });
   await say('p06', { pose: 'point', button: '응! 같이 볼래' });
-  gsap.to('.kidSticker,.kidCut,.statCard', { opacity: 0, scale: .6, duration: .6 });
+  gsap.to('.statCard', { opacity: 0, scale: .6, duration: .6 });
   await pause(600);
 }
 async function countUp() {
@@ -630,8 +681,8 @@ async function countUp() {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const total = Math.max(0, Math.round((today - start) / 86400000));
   const card = el('div', 'statCard', stage());
-  Object.assign(card.style, { top: '13%', width: 'auto', padding: '2.4vh 6vh' });
-  card.innerHTML = `<div style="font-size:6.4vh;color:#3c6fb6" id="cDate"></div><div style="font-size:3.6vh;margin-top:.6vh" id="cDays"></div>`;
+  Object.assign(card.style, { top: '30%', width: 'auto', padding: '3vh 7vh' });
+  card.innerHTML = `<div style="font-size:7.4vh;color:#3c6fb6" id="cDate"></div><div style="font-size:4vh;margin-top:.6vh" id="cDays"></div>`;
   gsap.fromTo(card, { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: .5 });
   const dur = 7000 / SPEED, t0 = performance.now();
   await new Promise(res => {
@@ -645,7 +696,7 @@ async function countUp() {
     };
     requestAnimationFrame(step);
   });
-  FX.burst(innerWidth / 2, innerHeight * .18, 60); Sound.sfx('sparkle');
+  FX.burst(innerWidth / 2, innerHeight * .3, 70); Sound.sfx('sparkle');
   S.daysTotal = total;
   await pause(700);
 }
@@ -663,9 +714,10 @@ let asideToken = 0;
 function aside(id, opts = {}) { // 기다리지 않는 짧은 한마디
   const text = fillText(opts.text || L[id] || '', opts.vars), my = ++asideToken;
   if (opts.pose) Elf.setPose(opts.pose);
+  const kx = opts.kid === undefined ? KID[id] : opts.kid; if (kx) Portrait.show(kx); else Portrait.hide();
   $('bubbleText').textContent = text; $('bubble').classList.add('on');
   Sound.playVoice(opts.voice || id);
-  setTimeout(() => { if (my === asideToken) $('bubble').classList.remove('on'); }, Math.max(2600, text.length * 160) / SPEED);
+  setTimeout(() => { if (my === asideToken) { $('bubble').classList.remove('on'); Portrait.hide(); } }, Math.max(2800, text.length * 170) / SPEED);
 }
 async function hubScreen(first) {
   clearStage(); setBg('night'); FX.snow = 0.5;
@@ -689,7 +741,13 @@ async function hubScreen(first) {
     if (it.type === 'travel' && S.lib.places.some(p => p.albums.some(a => a.isNew))) el('div', 'newBadge', c).textContent = 'NEW';
     c.onclick = () => { Sound.sfx('pop'); FX.burst(c.getBoundingClientRect().left + c.offsetWidth / 2, c.getBoundingClientRect().top + c.offsetHeight / 2, 30); S.visited.add(key); resolve(it); };
   }
-  gsap.fromTo('.hubCard', { opacity: 0, y: 40, scale: .9 }, { opacity: 1, y: 0, scale: 1, stagger: .12, duration: .6 / SPEED, ease: 'back.out(1.6)' });
+  const cards = [...wrap.querySelectorAll('.hubCard')], mid = (cards.length - 1) / 2;
+  cards.forEach((c, k) => {
+    const off = k - mid;
+    gsap.fromTo(c, { opacity: 0, z: -400, rotationY: off * -40, y: 60 }, { opacity: 1, z: -Math.abs(off) * 45, rotationY: off * -9, y: Math.abs(off) * 1.4 * VH(), duration: .9 / SPEED, delay: k * .1, ease: 'back.out(1.4)',
+      onComplete: () => gsap.to(c, { y: `+=${1.2 * VH()}`, duration: 1.8 + k * .17, yoyo: true, repeat: -1, ease: 'sine.inOut' }) });
+    c.addEventListener('pointerdown', () => gsap.to(c, { rotationX: 10, scale: .95, duration: .15 }));
+  });
   aside(first ? 'h01' : 'h02', { pose: first ? 'wave' : 'point' });
   const it = await chosen; asideToken++; hideBubble();
   return it;
@@ -759,11 +817,11 @@ function openZoom(list, idx, caption) {
     const ph = el('div', 'ph', card); ph.style.width = w + 'px'; ph.style.height = h + 'px'; ph.appendChild(img);
     if (caption) el('div', 'cap', card).textContent = caption;
     card.style.position = 'relative';
-    gsap.fromTo(card, { opacity: 0, x: dir * 60, rotation: dir * 4, scale: .9 }, { opacity: 1, x: 0, rotation: rand(-2, 2), scale: 1, duration: .45 / SPEED, ease: 'power2.out' });
+    gsap.fromTo(card, { opacity: 0, x: dir * 80, rotationY: dir * -65, transformPerspective: 1100, scale: .85 }, { opacity: 1, x: 0, rotationY: 0, rotation: rand(-2, 2), scale: 1, duration: .6 / SPEED, ease: 'power3.out' });
     gsap.fromTo(img, { scale: 1 }, { scale: 1.08, duration: 8, ease: 'none' });
     pv.style.visibility = i > 0 ? 'visible' : 'hidden'; nx.style.visibility = i < list.length - 1 ? 'visible' : 'hidden';
     Sound.sfx('page');
-    if (Math.random() < .4) aside(RANDOM_LINES[Math.floor(rand(0, RANDOM_LINES.length))], { pose: Math.random() < .5 ? 'surprise' : 'wave' });
+    if (Math.random() < .4) aside(RANDOM_LINES[Math.floor(rand(0, RANDOM_LINES.length))], { pose: Math.random() < .5 ? 'surprise' : 'wave', kid: null });
   };
   pv.onclick = e => { e.stopPropagation(); if (i > 0) { i--; show(-1); } };
   nx.onclick = e => { e.stopPropagation(); if (i < list.length - 1) { i++; show(1); } };
@@ -782,6 +840,48 @@ async function chapterScene(ch, i) {
 /* =============================================================
    여행 — 지도에서 골라 보기
    ============================================================= */
+/* =============================================================
+   여행 출발 — 하윤이가 길을 걸어가고 반짝이가 같이 날아감
+   ============================================================= */
+const HILL = (y1, y2, y3, c) => `<svg viewBox="0 0 1000 300" preserveAspectRatio="none"><path d="M0 ${y1} C180 ${y2} 320 ${y3} 500 ${y2 + 20} C680 ${y1 - 30} 820 ${y3} 1000 ${y2} L1000 300 L0 300Z" fill="${c}"/></svg>`;
+async function journey(place) {
+  clearStage(); FX.snow = 0;
+  setBg(null);
+  const art = placeArt(place.name), walkName = WALK_NAMES.find(n => S.lib.expressions[n]);
+  const J = el('div', 'journey', stage());
+  J.innerHTML = `<div class="jSky"></div><div class="jSun"></div>
+    <div class="jCloud" style="top:8%;left:8%"></div><div class="jCloud" style="top:16%;left:62%;transform:scale(.7)"></div><div class="jCloud" style="top:4%;left:38%;transform:scale(.5)"></div>
+    <div class="jDest">${art ? `<img src="${art}">` : `<div class="jDestTxt">${place.name}</div>`}</div>
+    <div class="jHill far">${HILL(150, 90, 130, '#b9d9a6')}</div>
+    <div class="jHill mid">${HILL(170, 120, 150, '#9ccb88')}</div>
+    <div class="jRoadWrap"><div class="jRoad"></div></div>
+    <div class="jBush l"></div><div class="jBush r"></div>
+    <div class="jKidWrap"></div>`;
+  const kidWrap = J.querySelector('.jKidWrap');
+  if (walkName) { const im = el('img', 'jKid', kidWrap); im.src = await blobUrl(S.lib.expressions[walkName]); }
+  gsap.fromTo(J, { opacity: 0 }, { opacity: 1, duration: .6 });
+  // 반짝이는 하윤이 오른쪽 어깨 옆에서 출발
+  Elf.place(walkName ? .56 : .42, .44); Elf.setPose('fly'); Elf.face(1); Elf.show(); $('elfWrap').classList.add('bob');
+  const T = 8 / SPEED;
+  const tl = gsap.timeline();
+  tl.fromTo(J.querySelector('.jDest'), { scale: .32, y: '2vh' }, { scale: 1, y: '7vh', duration: T, ease: 'power1.in' }, 0)
+    .to(J.querySelector('.jHill.far'), { scale: 1.18, duration: T, ease: 'none' }, 0)
+    .to(J.querySelector('.jHill.mid'), { scale: 1.45, y: '4vh', duration: T, ease: 'none' }, 0)
+    .to(J.querySelector('.jBush.l'), { scale: 2.6, x: '-26vw', opacity: 0, duration: T * .7, ease: 'power1.in' }, 0)
+    .to(J.querySelector('.jBush.r'), { scale: 2.6, x: '26vw', opacity: 0, duration: T * .7, ease: 'power1.in' }, 0)
+    .to(kidWrap, { scale: .5, y: '-17vh', duration: T, ease: 'sine.inOut' }, 0)
+    .to('#elfWrap', { x: innerWidth * .5 + 5 * VH(), y: innerHeight * .26, scale: .6, duration: T, ease: 'sine.inOut' }, 0)
+    .to(J.querySelectorAll('.jCloud'), { x: '-6vw', duration: T, ease: 'none' }, 0);
+  aside('go1', { vars: { place: place.name }, voice: 'go1_' + place.name, pose: 'fly' });
+  const mid = setTimeout(() => aside('go2', { vars: { place: place.name }, voice: 'go2_' + place.name, pose: 'surprise' }), T * 520);
+  await new Promise(res => { tl.eventCallback('onComplete', res); tapResolver = () => { tl.progress(1); }; });
+  tapResolver = null; clearTimeout(mid); asideToken++; hideBubble();
+  // 도착: 반짝 빛나며 여행지 안으로
+  FX.burst(innerWidth / 2, innerHeight * .3, 80); Sound.sfx('sparkle');
+  const flash = el('div', 'flash', stage());
+  await new Promise(r => gsap.fromTo(flash, { opacity: 0 }, { opacity: 1, duration: .45, yoyo: true, repeat: 1, onRepeat: () => { J.remove(); gsap.set('#elfWrap', { scale: 1 }); Elf.place(.0, .58); }, onComplete: () => { flash.remove(); r(); } }));
+}
+
 async function travelScene() {
   const places = S.lib.places.filter(p => p.albums.length);
   const dom = places.filter(p => p.region === '국내'), abroad = places.filter(p => p.region === '해외');
@@ -790,44 +890,86 @@ async function travelScene() {
   S.visitedMap = true;
   for (;;) {
     clearStage(); setBg('night'); FX.snow = .15;
-    MapView.show();
     const items = dom.map(p => ({ name: p.name, place: p, ll: PLACES[p.name] || null })).filter(it => it.ll);
     const unknown = dom.filter(p => !PLACES[p.name]);
-    MapView.korea(items);
-    const home = MapView.pt(PLACES[HOME]);
-    items.forEach(it => it.p = MapView.pt(it.ll));
-    const R = 7.4 * VH();
-    layoutCallouts(items, home, R, [{ x: home[0], y: home[1] - 2 * VH(), r: 8 * VH() }]);
-    homeMarker(home);
+    MapView.show(); MapView.korea(items, true);
+    gsap.set('#map', { transformPerspective: 110 * VH(), rotationX: 34, scale: 1.12, y: '4vh', transformOrigin: '50% 72%' });
+    await new Promise(r => requestAnimationFrame(r));
+    // 기울어진 지도 위의 실제 화면 위치
+    const scr = i => { const d = $('map').querySelector(`[data-dot="${i}"]`).getBoundingClientRect(); return [d.left + d.width / 2, d.top + d.height / 2]; };
+    const home = scr('home'); items.forEach((it, i) => it.s = scr(i));
+    const pins = layoutPins(items, home);
     let resolve; const chosen = new Promise(r => resolve = r);
-    items.forEach(it => { addMapSticker(it, R); it.node.classList.add('tappable'); it.node.style.cursor = 'pointer';
-      if (it.place.albums.some(a => a.isNew)) addNewBadge(it.x + R * .7, it.y - R * .8);
-      it.node.addEventListener('click', () => resolve({ kind: 'dom', it })); });
-    // 지도에 없는 국내 여행지·해외 버튼
+    pins.forEach(it => it.node.addEventListener('click', () => resolve({ kind: 'dom', it })));
     const side = el('div', 'mapSide', stage());
     unknown.forEach(p => { const b = el('button', 'chip tappable', side); b.textContent = '🎒 ' + p.name; b.onclick = () => resolve({ kind: 'other', place: p }); });
     if (abroad.length) { const b = el('button', 'chip big tappable', side); b.textContent = '✈ 바다 건너'; b.onclick = () => resolve({ kind: 'abroad' }); }
     const back = backButton('🏠 추억 상자'); back.then(() => resolve({ kind: 'back' }));
-    // 스티커와 겹치지 않는 왼쪽 위 빈 바다에 대기
-    Elf.place(0.03, 0.13); Elf.setPose('wave'); Elf.show();
+    Elf.place(0.03, 0.16); Elf.setPose('wave'); Elf.show(); Shadow.on(innerHeight * .2);
     if (firstTime) {
       firstTime = false;
       const np = places.find(p => p.albums.some(a => a.isNew));
       aside(np ? 'newp' : 't04', np ? { vars: { place: np.name }, voice: 'new_' + np.name, pose: 'surprise' } : { pose: 'point' });
     } else aside('t04', { pose: 'point' });
     const c = await chosen; asideToken++; hideBubble();
-    if (c.kind === 'back') { await MapView.hide(); return; }
-    if (c.kind === 'abroad') { await globeScene(abroad); continue; }
-    if (c.kind === 'other') { await MapView.hide(); await placeScene(c.place, '🗺 지도로'); continue; }
-    const it = c.it, sideX = it.x > innerWidth * .5 ? 1 : -1;
-    const ex = Math.min(innerWidth - Elf.size(), Math.max(0, it.x + sideX * R * .9 - (sideX < 0 ? Elf.size() : 0)));
-    const ey = Math.min(innerHeight * .62, Math.max(0, it.y - Elf.size() * .75));
-    await Elf.fly(ex / innerWidth, ey / innerHeight, { end: 'point' });
-    FX.burst(it.x, it.y, 34); Sound.sfx('sparkle');
-    await say('place', { pose: 'surprise', vars: { place: it.name }, voice: 'place_' + it.name });
+    if (c.kind === 'back') { Shadow.off(); await MapView.hide(); return; }
+    if (c.kind === 'abroad') { Shadow.off(); await globeScene(abroad); continue; }
+    if (c.kind === 'other') { Shadow.off(); await MapView.hide(); await journey(c.place); await placeScene(c.place, '🗺 지도로'); continue; }
+    // 고른 곳으로 날아가서 지도 안으로 들어가기
+    const it = c.it; Sound.sfx('pop');
+    await Elf.fly((it.px - Elf.size() * .2) / innerWidth, (it.py - Elf.size() * 1.1) / innerHeight, { dur: 1.8, end: 'point' });
+    Shadow.off(); FX.burst(it.px, it.py, 34); Sound.sfx('sparkle');
+    gsap.to('.pin,.homePin,.mapOverlay,.mapSide,.backBtn', { opacity: 0, duration: .5 });
+    await new Promise(r => gsap.to('#map', { scale: 2.6, rotationX: 52, transformOrigin: `${it.p[0]}px ${it.p[1]}px`, opacity: 0, duration: 1.3 / SPEED, ease: 'power2.in', onComplete: r }));
     await MapView.hide();
+    await journey(it.place);
+    await say('place', { pose: 'surprise', vars: { place: it.name }, voice: 'place_' + it.name });
     await placeScene(it.place, '🗺 지도로');
   }
+}
+/* 반짝이 그림자 (지도 위) */
+const Shadow = {
+  el: null, ground: 0, fn: null,
+  on(groundGap) {
+    this.off(); this.el = el('div', 'elfShadow', stage());
+    this.fn = () => { const r = $('elfWrap').getBoundingClientRect(); if (!this.el) return;
+      gsap.set(this.el, { x: r.left + r.width * .5 - 5 * VH(), y: r.top + r.height * 1.02 + 2 * VH() }); };
+    gsap.ticker.add(this.fn);
+  },
+  off() { if (this.fn) gsap.ticker.remove(this.fn); this.fn = null; if (this.el) this.el.remove(); this.el = null; }
+};
+/* 기울어진 지도 위에 서 있는 팻말 배치 */
+function layoutPins(items, home) {
+  const R = 7.6 * VH(), stem = 7 * VH();
+  const ov = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); ov.setAttribute('class', 'mapOverlay'); stage().appendChild(ov);
+  items.forEach(it => { it.x = it.s[0]; it.y = it.s[1] - stem - R; });
+  const fixed = { x: home[0], y: home[1] - 4 * VH(), r: 6 * VH() };
+  for (let k = 0; k < 160; k++) {
+    for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+      const a = items[i], b = items[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, need = R * 2.5;
+      if (d < need) { const m = (need - d) / 2, ux = dx / d, uy = dy / d; a.x -= ux * m; a.y -= uy * m; b.x += ux * m; b.y += uy * m; }
+    }
+    for (const it of items) { const dx = it.x - fixed.x, dy = it.y - fixed.y, d = Math.hypot(dx, dy) || 1, need = R + fixed.r; if (d < need) { it.x += dx / d * (need - d); it.y += dy / d * (need - d); } }
+    items.forEach(it => { it.x = Math.min(innerWidth - R * 1.2, Math.max(R * 1.2, it.x)); it.y = Math.min(innerHeight - R * 1.6, Math.max(R + 11 * VH(), it.y)); });
+  }
+  let svg = '';
+  items.forEach(it => { svg += `<ellipse cx="${it.s[0]}" cy="${it.s[1]}" rx="${2.6 * VH()}" ry="${.9 * VH()}" fill="rgba(60,40,20,.28)"/>
+    <line x1="${it.s[0]}" y1="${it.s[1]}" x2="${it.x}" y2="${it.y + R * .9}" stroke="#8a6a48" stroke-width="${.7 * VH()}" stroke-linecap="round"/>
+    <circle cx="${it.s[0]}" cy="${it.s[1]}" r="${.8 * VH()}" fill="#e0574a"/>`; });
+  svg += `<ellipse cx="${home[0]}" cy="${home[1]}" rx="${3 * VH()}" ry="${1 * VH()}" fill="rgba(60,40,20,.3)"/>`;
+  ov.innerHTML = svg;
+  const hp = el('div', 'homePin', stage()); hp.innerHTML = `<div class="hpLabel">우리 집</div><div class="hpIcon">🏠</div>`;
+  Object.assign(hp.style, { left: home[0] + 'px', top: home[1] + 'px' });
+  items.forEach((it, i) => {
+    const pin = el('div', 'pin tappable', stage()); const art = placeArt(it.name);
+    pin.innerHTML = (art ? `<img src="${art}">` : `<div class="pinTxt">🎒</div>`) + `<div class="pinLabel">${it.name}</div>`;
+    if (it.place.albums.some(a => a.isNew)) el('span', 'newBadge', pin).textContent = 'NEW';
+    Object.assign(pin.style, { left: it.x + 'px', top: it.y + 'px', width: R * 2 + 'px', height: R * 2 + 'px' });
+    it.node = pin; it.px = it.x; it.py = it.y;
+    gsap.fromTo(pin, { scale: 0, y: 20 }, { scale: 1, y: 0, duration: .6 / SPEED, delay: .15 * i, ease: 'back.out(2)' });
+    gsap.to(pin, { y: '-=0.8vh', duration: 1.6 + i * .2, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: .8 });
+  });
+  return items;
 }
 function addNewBadge(x, y) {
   const ns = 'http://www.w3.org/2000/svg', g = document.createElementNS(ns, 'g'); $('map').appendChild(g);
@@ -865,7 +1007,7 @@ async function globeScene(abroad) {
   await MapView.hide();
   for (;;) {
     clearStage(); setBg('night'); FX.snow = 0;
-    const svg = $('map'); svg.classList.remove('hidden'); svg.style.opacity = 1; svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const svg = $('map'); svg.classList.remove('hidden'); gsap.set(svg, { clearProps: 'transform' }); svg.style.opacity = 1; svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const r = Math.min(W, H) * 0.40, cx = W * 0.55, cy = H * 0.50;
     const proj = d3.geoOrthographic().scale(r).translate([cx, cy]).clipAngle(90);
     const path = d3.geoPath(proj), grat = d3.geoGraticule10();
@@ -902,9 +1044,11 @@ async function globeScene(abroad) {
         gsap.set('#elfWrap', { x: x - Elf.size() * .5, y: y - Elf.size() * .75 }); FX.trail(x, y); }, onComplete: res }); });
       const end = pts[pts.length - 1]; Elf.pos = { fx: (end[0] - Elf.size() * .5) / W, fy: (end[1] - Elf.size() * .75) / H }; Elf.face(1);
       FX.burst(end[0], end[1], 40); Sound.sfx('sparkle');
-      await say('place', { pose: 'surprise', vars: { place: p.name }, voice: 'place_' + p.name });
+      await pause(700);
     }
     await MapView.hide();
+    await journey(p);
+    await say('place', { pose: 'surprise', vars: { place: p.name }, voice: 'place_' + p.name });
     await placeScene(p, '🌏 지구본으로');
   }
 }
@@ -914,32 +1058,32 @@ async function globeScene(abroad) {
    ============================================================= */
 async function epilogue() {
   clearStage(); setBg('xmas', 'soft'); FX.snow = 0.5;
-  await Elf.fly(0.06, 0.48, { end: 'surprise' });
-  const kid = await kidSticker(['신남', '웃음', '기본'], { size: 24, fx: .85, fy: .34 });
+  await Elf.fly(0.06, 0.40, { end: 'surprise' });
   await say('e01', { pose: 'surprise' });
   const trips = S.lib.places.reduce((n, p) => n + p.albums.length, 0);
   const card = el('div', 'statCard', stage());
-  Object.assign(card.style, { top: '36%', left: '43%', width: 'min(56vw,92vh)' });
+  Object.assign(card.style, { top: '34%', left: '56%', width: 'min(60vw,96vh)' });
   card.innerHTML = `<h3>${fillText('{이름}이의 반짝이는 기록')}</h3><div class="stats">
     <div class="stat"><b id="s1">0</b><span>함께한 날</span></div>
     <div class="stat"><b id="s2">0</b><span>다녀온 여행</span></div>
     <div class="stat"><b id="s3">0</b><span>추억 사진</span></div>
     ${S.giftsFound ? `<div class="stat"><b id="s4">0</b><span>찾은 선물</span></div>` : ''}</div>`;
-  gsap.fromTo(card, { opacity: 0, scale: .8 }, { opacity: 1, scale: 1, duration: .7, ease: 'back.out(1.6)' });
+  gsap.fromTo(card, { opacity: 0, scale: .8, rotationX: -40, transformPerspective: 900 }, { opacity: 1, scale: 1, rotationX: 0, duration: .9, ease: 'back.out(1.6)' });
   const days = S.daysTotal || 0;
   const tick = (id, v) => { const o = { v: 0 }; gsap.to(o, { v, duration: 1.6 / SPEED, ease: 'power2.out', onUpdate: () => { const e = $(id); if (e) e.textContent = Math.round(o.v).toLocaleString(); } }); };
+  const nWalk = WALK_NAMES.filter(n => S.lib.expressions[n]).length;
   tick('s1', days); tick('s2', trips); tick('s3', S.lib.photos - Object.keys(S.lib.expressions).length); if (S.giftsFound) tick('s4', S.giftsFound);
-  Sound.sfx('sparkle');
-  await beat(4200);
+  Sound.sfx('sparkle'); Portrait.show('신남');
+  await beat(4600);
   gsap.to(card, { opacity: 0, scale: .8, duration: .5, onComplete: () => card.remove() });
   await say('e02', { pose: 'bye' });
   await say('e03', { pose: 'bye' });
   await say('e04', { pose: 'wave' });
+  await say('e05', { pose: 'wave' });
   FX.snow = 1;
   for (let i = 0; i < 6; i++) setTimeout(() => FX.burst(rand(.1, .9) * innerWidth, rand(.1, .5) * innerHeight, 30, rand(0, 360)), i * 300);
-  await say('e05', { pose: 'wave', button: '↺ 처음으로' });
+  await say('e06', { pose: 'wave', button: '↺ 처음으로' });
 }
-
 /* =============================================================
    전체 진행
    ============================================================= */
