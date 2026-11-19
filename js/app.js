@@ -4,7 +4,7 @@
    - 이 코드에는 개인 정보가 들어 있지 않습니다.
    ============================================================= */
 'use strict';
-const VERSION = 'v1.1.0';
+const VERSION = 'v1.1.1';
 const QS = new URLSearchParams(location.search);
 const SPEED = Math.max(0.1, +QS.get('speed') || 1);   // 검사용 배속
 
@@ -1011,10 +1011,13 @@ function bindUi() {
   };
   $('saveBtn').onclick = saveSetup;
   $('cancelSetup').onclick = () => { $('setupLayer').classList.add('hidden'); if (S.settings && S.lib) showStart(); };
-  // 부모 메뉴: 톱니를 2초 길게 누르기
-  let hold = null; const g = $('gearBtn');
-  g.addEventListener('pointerdown', e => { e.stopPropagation(); g.classList.add('holding'); hold = setTimeout(() => { g.classList.remove('holding'); $('libSummary').innerHTML = libSummary(); $('parentLayer').classList.remove('hidden'); }, 1800); });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => g.addEventListener(ev, () => { clearTimeout(hold); g.classList.remove('holding'); }));
+  // 부모 메뉴: 톱니를 2초 길게 누르기 또는 빠르게 5번 누르기 (태블릿 길게 누르기 오작동 대비)
+  let hold = null, taps = [], down = 0; const g = $('gearBtn');
+  const openParent = () => { clearTimeout(hold); g.classList.remove('holding'); taps = []; $('libSummary').innerHTML = libSummary(); $('parentLayer').classList.remove('hidden'); };
+  g.addEventListener('contextmenu', e => e.preventDefault());
+  g.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); down = Date.now(); g.classList.add('holding'); clearTimeout(hold); hold = setTimeout(openParent, 1800);
+    const now = Date.now(); taps = taps.filter(t => now - t < 2500); taps.push(now); if (taps.length >= 5) openParent(); });
+  g.addEventListener('pointerup', () => { clearTimeout(hold); g.classList.remove('holding'); });
   $('pmClose').onclick = () => $('parentLayer').classList.add('hidden');
   $('pmSetup').onclick = () => { $('parentLayer').classList.add('hidden'); $('startLayer').classList.add('hidden'); $('importReport').innerHTML = ''; $('progress').classList.add('hidden'); openSetup(true); };
   $('pmRestart').onclick = () => location.reload();
