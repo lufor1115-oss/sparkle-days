@@ -4,7 +4,7 @@
    - 이 코드에는 개인 정보가 들어 있지 않습니다.
    ============================================================= */
 'use strict';
-const VERSION = 'v1.2.0';
+const VERSION = 'v1.2.1';
 const QS = new URLSearchParams(location.search);
 const SPEED = Math.max(0.1, +QS.get('speed') || 1);   // 검사용 배속
 
@@ -487,7 +487,7 @@ let typing = null;
 async function say(id, opts = {}) {
   const text = fillText(opts.text || L[id] || '', opts.vars);
   if (opts.pose) Elf.setPose(opts.pose);
-  asideToken++;
+  asideToken++; Sound.stopVoice();
   const kx = opts.kid === undefined ? KID[id] : opts.kid; if (kx) Portrait.show(kx); else Portrait.hide();
   const b = $('bubble'), bt = $('bubbleText'); bt.textContent = ''; b.classList.add('on');
   if (opts.button) { /* 버튼 붙이기는 아래 */ }
@@ -716,8 +716,11 @@ function aside(id, opts = {}) { // 기다리지 않는 짧은 한마디
   if (opts.pose) Elf.setPose(opts.pose);
   const kx = opts.kid === undefined ? KID[id] : opts.kid; if (kx) Portrait.show(kx); else Portrait.hide();
   $('bubbleText').textContent = text; $('bubble').classList.add('on');
-  Sound.playVoice(opts.voice || id);
-  setTimeout(() => { if (my === asideToken) { $('bubble').classList.remove('on'); Portrait.hide(); } }, Math.max(2800, text.length * 170) / SPEED);
+  Sound.stopVoice();
+  const voiceDone = Sound.playVoice(opts.voice || id);
+  const readDone = new Promise(r => setTimeout(r, Math.max(2800, text.length * 170) / SPEED));
+  // 글 읽는 시간과 목소리가 모두 끝난 뒤에 말풍선을 닫음
+  Promise.all([voiceDone, readDone]).then(() => { if (my === asideToken) { $('bubble').classList.remove('on'); Portrait.hide(); } });
 }
 async function hubScreen(first) {
   clearStage(); setBg('night'); FX.snow = 0.5;
