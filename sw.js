@@ -1,5 +1,5 @@
 /* 오프라인 실행용 캐시 — 앱 파일만 저장합니다 (사진은 IndexedDB) */
-const CACHE = 'sparkle-v1.3.0';
+const CACHE = 'sparkle-v1.3.1';
 const FILES = [
   "./",
   "assets/bg/ch1.jpg",
@@ -8,6 +8,12 @@ const FILES = [
   "assets/bg/night.jpg",
   "assets/bg/xmas.jpg",
   "assets/elf/bye.webp",
+  "assets/elf/map.webp",
+  "assets/elf/album.webp",
+  "assets/elf/back.webp",
+  "assets/elf/cheer.webp",
+  "assets/elf/bow.webp",
+  "assets/elf/sad.webp",
   "assets/elf/fly.webp",
   "assets/elf/point.webp",
   "assets/elf/surprise.webp",

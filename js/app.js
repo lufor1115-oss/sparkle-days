@@ -4,7 +4,7 @@
    - 이 코드에는 개인 정보가 들어 있지 않습니다.
    ============================================================= */
 'use strict';
-const VERSION = 'v1.3.0';
+const VERSION = 'v1.3.1';
 const QS = new URLSearchParams(location.search);
 const SPEED = Math.max(0.1, +QS.get('speed') || 1);   // 검사용 배속
 
@@ -462,7 +462,7 @@ const Elf = {
     this.trailOn = false; this.pos = { fx, fy }; this.face(1);
     $('elfWrap').classList.add('bob'); if (end) this.setPose(end);
   },
-  face(d) { this.flip = d; gsap.set('#elfImg,#elfImg2', { scaleX: d }); },
+  face(d) { this.flip = d; gsap.set('#elfImg,#elfImg2', { scaleX: this.pose === 'back' ? 1 : d }); },
   /** 하윤이 주위를 천천히 빙글빙글 */
   orbit(cx, cy, rx, ry, period = 7) {
     let on = true; const s = this.size(), t0 = performance.now(); $('elfWrap').classList.remove('bob'); this.setPose('fly');
@@ -588,7 +588,7 @@ function hideGift(sceneKey) {
     const r = g.getBoundingClientRect(); FX.burst(r.left + r.width / 2, r.top + r.height / 2, 60, 45);
     Sound.sfx('pop'); setTimeout(() => Sound.sfx('sparkle'), 120);
     S.giftsFound++; S.giftFound.add(sceneKey); g.remove();
-    aside('g02', { pose: 'surprise' });
+    aside('g02', { pose: 'cheer' });
   }, { once: true });
 }
 
@@ -754,7 +754,7 @@ function aside(id, opts = {}) { // 기다리지 않는 짧은 한마디
 }
 async function hubScreen(first) {
   clearStage(); setBg('night'); FX.snow = 0.5;
-  await Elf.fly(0.01, 0.56, { end: 'point' });
+  await Elf.fly(0.01, 0.56, { end: 'album' });
   const wrap = el('div', 'hub', stage());
   const items = [];
   S.lib.chapters.forEach((ch, i) => items.push({ type: 'chapter', ch, i, title: ch.title || `${i + 1}번째 이야기`, bg: CH_BG[Math.min(i, 2)], photo: ch.photos[0] }));
@@ -781,7 +781,7 @@ async function hubScreen(first) {
       onComplete: () => gsap.to(c, { y: `+=${1.2 * VH()}`, duration: 1.8 + k * .17, yoyo: true, repeat: -1, ease: 'sine.inOut' }) });
     c.addEventListener('pointerdown', () => gsap.to(c, { rotationX: 10, scale: .95, duration: .15 }));
   });
-  aside(first ? (S.hubLine || 'h03') : 'h02', { pose: first ? 'wave' : 'point' });
+  aside(first ? (S.hubLine || 'h03') : 'h02', { pose: 'album' });
   const it = await chosen; asideToken++; hideBubble();
   return it;
 }
@@ -895,7 +895,7 @@ async function journey(place) {
   if (walkName) { const im = el('img', 'jKid', kidWrap); im.src = await blobUrl(S.lib.expressions[walkName]); }
   gsap.fromTo(J, { opacity: 0 }, { opacity: 1, duration: .6 });
   // 반짝이는 하윤이 오른쪽 어깨 옆에서 출발
-  Elf.place(walkName ? .56 : .42, .44); Elf.setPose('fly'); Elf.face(1); Elf.show(); $('elfWrap').classList.add('bob');
+  Elf.place(walkName ? .56 : .42, .40); Elf.setPose('back'); Elf.face(1); Elf.show(); $('elfWrap').classList.add('bob');
   const T = 8 / SPEED;
   const tl = gsap.timeline();
   tl.fromTo(J.querySelector('.jDest'), { scale: .32, y: '2vh' }, { scale: 1, y: '7vh', duration: T, ease: 'power1.in' }, 0)
@@ -906,8 +906,8 @@ async function journey(place) {
     .to(kidWrap, { scale: .5, y: '-17vh', duration: T, ease: 'sine.inOut' }, 0)
     .to('#elfWrap', { x: innerWidth * .5 + 5 * VH(), y: innerHeight * .26, scale: .6, duration: T, ease: 'sine.inOut' }, 0)
     .to(J.querySelectorAll('.jCloud'), { x: '-6vw', duration: T, ease: 'none' }, 0);
-  aside('go1', { vars: { place: place.name }, voice: 'go1_' + place.name, pose: 'fly' });
-  const mid = setTimeout(() => aside('go2', { vars: { place: place.name }, voice: 'go2_' + place.name, pose: 'surprise' }), T * 520);
+  aside('go1', { vars: { place: place.name }, voice: 'go1_' + place.name, pose: 'back' });
+  const mid = setTimeout(() => aside('go2', { vars: { place: place.name }, voice: 'go2_' + place.name, pose: 'back' }), T * 520);
   await new Promise(res => { tl.eventCallback('onComplete', res); tapResolver = () => { tl.progress(1); }; });
   tapResolver = null; clearTimeout(mid); asideToken++; hideBubble();
   // 도착: 반짝 빛나며 여행지 안으로
@@ -939,12 +939,12 @@ async function travelScene() {
     unknown.forEach(p => { const b = el('button', 'chip tappable', side); b.textContent = '🎒 ' + p.name; b.onclick = () => resolve({ kind: 'other', place: p }); });
     if (abroad.length) { const b = el('button', 'chip big tappable', side); b.textContent = '✈ 바다 건너'; b.onclick = () => resolve({ kind: 'abroad' }); }
     const back = backButton('🏠 추억 상자'); back.then(() => resolve({ kind: 'back' }));
-    Elf.place(0.03, 0.16); Elf.setPose('wave'); Elf.show(); Shadow.on(innerHeight * .2);
+    Elf.place(0.03, 0.16); Elf.setPose('map'); Elf.show(); Shadow.on(innerHeight * .2);
     if (firstTime) {
       firstTime = false;
       const np = places.find(p => p.albums.some(a => a.isNew));
-      aside(np ? 'newp' : 't04', np ? { vars: { place: np.name }, voice: 'new_' + np.name, pose: 'surprise' } : { pose: 'point' });
-    } else aside('t04', { pose: 'point' });
+      aside(np ? 'newp' : 't04', np ? { vars: { place: np.name }, voice: 'new_' + np.name, pose: 'surprise' } : { pose: 'map' });
+    } else aside('t04', { pose: 'map' });
     const c = await chosen; asideToken++; hideBubble();
     if (c.kind === 'back') { Shadow.off(); await MapView.hide(); return; }
     if (c.kind === 'abroad') { Shadow.off(); await globeScene(abroad); continue; }
@@ -957,7 +957,7 @@ async function travelScene() {
     await new Promise(r => gsap.to('#map', { scale: 2.6, rotationX: 52, transformOrigin: `${it.p[0]}px ${it.p[1]}px`, opacity: 0, duration: 1.3 / SPEED, ease: 'power2.in', onComplete: r }));
     await MapView.hide();
     await journey(it.place);
-    await say('place', { pose: 'surprise', vars: { place: it.name }, voice: 'place_' + it.name });
+    await say('place', { pose: 'cheer', vars: { place: it.name }, voice: 'place_' + it.name });
     await placeScene(it.place, '🗺 지도로');
   }
 }
@@ -1083,7 +1083,7 @@ async function globeScene(abroad) {
     }
     await MapView.hide();
     await journey(p);
-    await say('place', { pose: 'surprise', vars: { place: p.name }, voice: 'place_' + p.name });
+    await say('place', { pose: 'cheer', vars: { place: p.name }, voice: 'place_' + p.name });
     await placeScene(p, '🌏 지구본으로');
   }
 }
@@ -1094,7 +1094,7 @@ async function globeScene(abroad) {
 async function epilogue() {
   clearStage(); setBg('xmas', 'soft'); FX.snow = 0.5;
   await Elf.fly(0.06, 0.40, { end: 'surprise' });
-  await say('e01', { pose: 'surprise' });
+  await say('e01', { pose: 'cheer' });
   const trips = S.lib.places.reduce((n, p) => n + p.albums.length, 0);
   const card = el('div', 'statCard', stage());
   Object.assign(card.style, { top: '34%', left: '56%', width: 'min(60vw,96vh)' });
@@ -1111,13 +1111,14 @@ async function epilogue() {
   Sound.sfx('sparkle'); Portrait.show('신남');
   await beat(4600);
   gsap.to(card, { opacity: 0, scale: .8, duration: .5, onComplete: () => card.remove() });
-  await say('e02', { pose: 'bye' });
-  await say('e03', { pose: 'bye' });
+  await say('e02', { pose: 'sad' });
+  await say('e03', { pose: 'sad' });
   await say('e04', { pose: 'wave' });
-  await say('e05', { pose: 'wave' });
+  await say('e05', { pose: 'bow' });
   FX.snow = 1;
   for (let i = 0; i < 6; i++) setTimeout(() => FX.burst(rand(.1, .9) * innerWidth, rand(.1, .5) * innerHeight, 30, rand(0, 360)), i * 300);
-  await say('e06', { pose: 'wave', button: '↺ 처음으로' });
+  Elf.setPose('bye'); await pause(900);
+  await say('e06', { pose: 'cheer', button: '↺ 처음으로' });
 }
 /* =============================================================
    전체 진행
@@ -1141,7 +1142,7 @@ async function greeting(v) {
     id = pool[Math.floor(rand(0, pool.length))];
   }
   v.lastGreet = id;
-  await say(id, { pose: id === 'hiNew' || id === 'hiGap' ? 'surprise' : 'wave' });
+  await say(id, { pose: id === 'hiNew' || id === 'hiGap' ? 'surprise' : (id === 'hi2' || id === 'hiX') ? 'cheer' : 'wave' });
 }
 async function run(from = 'start') {
   if (S.running) return; S.running = true; S.giftsFound = 0; S.giftsTotal = 0;
