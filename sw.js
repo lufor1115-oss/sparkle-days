@@ -1,5 +1,5 @@
 /* 오프라인 실행용 캐시 — 앱 파일만 저장합니다 (사진은 IndexedDB) */
-const CACHE = 'sparkle-v1.2.1';
+const CACHE = 'sparkle-v1.3.0';
 const FILES = [
   "./",
   "assets/bg/ch1.jpg",

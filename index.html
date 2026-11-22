@@ -52,10 +52,10 @@
   <!-- 처음 설정 (부모용) -->
   <div id="setupLayer" class="layer hidden">
     <div class="panel">
-      <h2>처음 설정 <small>(부모님용)</small></h2>
-      <p class="note">입력한 이름·생일·사진은 이 태블릿 안에만 저장됩니다.</p>
-      <label>아이 이름 <input id="inName" type="text" placeholder="예: 하윤" maxlength="10"></label>
-      <label>생일 <input id="inBirth" type="date"></label>
+      <h2 id="setupTitle">처음 설정 <small>(부모님용)</small></h2>
+      <p class="note" id="setupNote">입력한 이름·생일·사진은 이 태블릿 안에만 저장됩니다.</p>
+      <label class="nameRow">아이 이름 <input id="inName" type="text" placeholder="예: 하윤" maxlength="10"></label>
+      <label class="nameRow">생일 <input id="inBirth" type="date"></label>
       <label class="filelabel">사진 압축 파일(ZIP) — 여러 개 선택 가능 <input id="inZip" type="file" accept=".zip,application/zip" multiple></label>
       <div id="progress" class="hidden"><div id="progBar"></div><span id="progText"></span></div>
       <div id="importReport"></div>
@@ -72,8 +72,10 @@
       <h2>부모 메뉴</h2>
       <div id="libSummary" class="note"></div>
       <div class="col">
-        <button id="pmSetup" class="bigbtn small">사진·이름·생일 다시 설정</button>
-        <button id="pmRestart" class="bigbtn small">처음부터 다시 보기</button>
+        <button id="pmAdd" class="bigbtn small">📷 사진 추가하기 (지금 사진 그대로)</button>
+        <button id="pmPrologue" class="bigbtn small">✨ 처음 만남 장면 다시 보기</button>
+        <button id="pmSetup" class="ghost">전체 다시 설정 (사진을 모두 새로 불러옴)</button>
+        <button id="pmRestart" class="ghost">처음 화면으로</button>
         <button id="pmJump" class="bigbtn small">추억 상자로 바로 가기</button>
         <button id="pmClose" class="ghost">닫기</button>
       </div>

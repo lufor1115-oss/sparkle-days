@@ -4,7 +4,7 @@
    - 이 코드에는 개인 정보가 들어 있지 않습니다.
    ============================================================= */
 'use strict';
-const VERSION = 'v1.2.1';
+const VERSION = 'v1.3.0';
 const QS = new URLSearchParams(location.search);
 const SPEED = Math.max(0.1, +QS.get('speed') || 1);   // 검사용 배속
 
@@ -61,6 +61,17 @@ const L = {
   newp:'이번에는 {장소}에 다녀왔구나?',
   go1:'나도 같이 갈래! {장소}로 출발~',
   go2:'와, 저기 {장소}가 보여!',
+  hi1:'{이름}아! 또 만났네~ 보고 싶었어!',
+  hi2:'짠! 반짝이 왔지롱~ 꺄르륵!',
+  hi3:'{이름}이는 오늘도 착하게 지냈지?',
+  hi4:'쉿… 반짝이가 살금살금 놀러 왔어!',
+  hiM:'좋은 아침, {이름}아! 잘 잤어?',
+  hiA:'{이름}아, 오늘 하루 재밌게 놀았어?',
+  hiE:'벌써 저녁이네? {이름}이는 오늘 하루 어땠어?',
+  hiGap:'우와, 오랜만이야! 그동안 잘 지냈어?',
+  hiNew:'어? 새로운 사진이 생겼네! 우리 같이 볼까?',
+  hiX:'메리 크리스마스, {이름}아! 오늘은 정말 특별한 날이야!',
+  h03:'오늘은 어디로 사진을 같이 볼까?',
   e01:'{이름}이랑 함께한 시간을 돌아보니 정말 행복하다!',
   e02:'이제 나는 눈꽃 나라로 돌아가야 해…',
   e03:'크리스마스 요정은 착한 아이를 스스로 찾아온단다.',
@@ -72,6 +83,7 @@ const L = {
 const KID = { p01:'놀람', p02:'기쁨', p03:'기쁨', p04:'놀람', p05:'놀람', p06:'기쁨', c1:'기쁨', c2:'기쁨', c3:'신남', cN:'기쁨',
   g01:'놀람', g02:'신남', r01:'기쁨', r02:'기쁨', r03:'기쁨', r04:'신남', r05:'신남', t03:'놀람', t04:'기쁨', y01:'기쁨', place:'신남',
   h01:'기쁨', h02:'기쁨', a01:'기쁨', newp:'놀람', memo:'기쁨', go1:'신남', go2:'놀람',
+  hi1:'기쁨', hi2:'신남', hi3:'기쁨', hi4:'놀람', hiM:'기쁨', hiA:'기쁨', hiE:'기쁨', hiGap:'놀람', hiNew:'놀람', hiX:'신남', h03:'기쁨',
   e01:'기쁨', e02:'슬픔', e03:'슬픔', e04:'기쁨', e05:'기쁨', e06:'신남' };
 const EXPR_ALIASES = { 기쁨:['기쁨','웃음','미소','기본','신남'], 놀람:['놀람','기쁨','웃음','미소','기본'], 슬픔:['슬픔','아쉬움','속상','시무룩'], 신남:['신남','기쁨','웃음','미소','기본'] };
 const WALK_NAMES = ['걷기', '뒷모습', '걷는'];
@@ -183,14 +195,23 @@ async function readZipEntries(file) {
   return entries;
 }
 /** 압축 파일 여러 개를 한 번에 불러옵니다 (용량이 크면 나눠서 압축 가능) */
-async function importZip(files, onProg) {
+/** merge=true: 지금 사진은 그대로 두고 새 사진만 더함 / false: 전체를 새로 불러옴 */
+async function importZip(files, onProg, { merge = false } = {}) {
   files = [...files];
   const prev = await DB.get('kv', 'lib');
   const prevKeys = new Set(prev && prev.albumKeys || []);
-  await DB.clear('blobs'); S.urlCache.forEach(u => URL.revokeObjectURL(u)); S.urlCache.clear();
-  const lib = { chapters: [], expressions: {}, places: [], voices: {}, sounds: {}, albumKeys: [], photos: 0, skipped: [], importedAt: Date.now() };
-  const chMap = new Map(), plMap = new Map();
-  let n = 0;
+  let lib, chMap = new Map(), plMap = new Map(), n = 0;
+  const added = { photos: 0, dup: 0, albums: new Set() };
+  if (merge && prev) {
+    lib = prev; lib.skipped = []; lib.importedAt = Date.now(); lib.fileKeys = lib.fileKeys || [];
+    lib.chapters.forEach(c => chMap.set(c.order, c));
+    lib.places.forEach(p => plMap.set(p.region + '|' + p.name, { ...p, albums: new Map(p.albums.map(a => [a.year, a])) }));
+    n = lib.nextId || (lib.photos + 1000);
+  } else {
+    await DB.clear('blobs'); S.urlCache.forEach(u => URL.revokeObjectURL(u)); S.urlCache.clear();
+    lib = { chapters: [], expressions: {}, places: [], voices: {}, sounds: {}, albumKeys: [], photos: 0, skipped: [], fileKeys: [], importedAt: Date.now() };
+  }
+  const seen = new Set(lib.fileKeys);
   for (let fi = 0; fi < files.length; fi++) {
     let entries = await readZipEntries(files[fi]);
     const memos = new Map();
@@ -221,6 +242,9 @@ async function importZip(files, onProg) {
           target = { kind: 'chapter', order: +m[1], title: (m[2] || '').replace(/[_]+/g, ' ').trim(), dirKey: top };
         }
         if (!target) { lib.skipped.push(x.parts.join('/')); continue; }
+        const fkey = x.parts.join('/') + '|' + ((x.e._data && x.e._data.uncompressedSize) || '');
+        if (target.kind !== 'expr' && seen.has(fkey)) { added.dup++; continue; }   // 이미 있는 사진은 건너뜀
+        seen.add(fkey); lib.fileKeys.push(fkey);
         const raw = await x.e.async('blob');
         const small = await shrinkImage(raw, target.kind === 'expr' && /\.(png|webp)$/i.test(f));
         if (target.kind === 'expr' && small.cutout) (lib.cutouts = lib.cutouts || {})[target.name] = true;
@@ -230,25 +254,31 @@ async function importZip(files, onProg) {
         else if (target.kind === 'chapter') {
           if (!chMap.has(target.order)) chMap.set(target.order, { order: target.order, title: target.title, memo: '', photos: [] });
           const c = chMap.get(target.order); c.photos.push(key); if (!c.memo && memos.get(target.dirKey)) c.memo = memos.get(target.dirKey);
+          if (merge) { c.isNew = true; added.albums.add(c.title || ('장 ' + c.order)); }
         } else {
           const pk = target.region + '|' + target.place;
           if (!plMap.has(pk)) plMap.set(pk, { region: target.region, name: target.place, albums: new Map() });
           const p = plMap.get(pk);
           if (!p.albums.has(target.year)) p.albums.set(target.year, { year: target.year, memo: '', photos: [] });
           const a = p.albums.get(target.year); a.photos.push(key); if (!a.memo && memos.get(target.dirKey)) a.memo = memos.get(target.dirKey);
+          if (merge) { a.isNew = true; added.albums.add((target.year ? target.year + ' ' : '') + target.place); }
         }
-        lib.photos++;
+        lib.photos++; if (target.kind !== 'expr') added.photos++;
       } catch (err) { console.warn('skip', x.parts.join('/'), err); lib.skipped.push(x.parts.join('/')); }
     }
     entries = null;
   }
   lib.chapters = [...chMap.values()].sort((a, b) => a.order - b.order);
+  lib.places = []; lib.albumKeys = [];
   for (const p of plMap.values()) {
     const albums = [...p.albums.values()].sort((a, b) => (a.year || '0').localeCompare(b.year || '0'));
-    albums.forEach(a => { const k = p.region + '|' + p.name + '|' + a.year; a.isNew = prevKeys.size > 0 && !prevKeys.has(k); lib.albumKeys.push(k); });
+    albums.forEach(a => { const k = p.region + '|' + p.name + '|' + a.year; if (!merge) a.isNew = prevKeys.size > 0 && !prevKeys.has(k); lib.albumKeys.push(k); });
     lib.places.push({ region: p.region, name: p.name, albums, first: albums[0] ? albums[0].year : '' });
   }
   lib.places.sort((a, b) => (a.first || '9').localeCompare(b.first || '9'));
+  lib.nextId = n;
+  if (added.photos > 0 && (merge || prevKeys.size > 0)) lib.announceNew = true;   // 다음에 반짝이가 "새 사진이 생겼네!"
+  lib.lastAdd = { photos: added.photos, dup: added.dup, albums: [...added.albums] };
   await DB.put('kv', 'lib', lib);
   return lib;
 }
@@ -741,7 +771,7 @@ async function hubScreen(first) {
     const t = el('div', 'hubTitle', c); t.textContent = it.title;
     const key = it.type + (it.i ?? '');
     if (S.visited.has(key)) el('div', 'hubStar', c).textContent = '⭐';
-    if (it.type === 'travel' && S.lib.places.some(p => p.albums.some(a => a.isNew))) el('div', 'newBadge', c).textContent = 'NEW';
+    if ((it.type === 'travel' && S.lib.places.some(p => p.albums.some(a => a.isNew))) || (it.type === 'chapter' && it.ch.isNew)) el('div', 'newBadge', c).textContent = 'NEW';
     c.onclick = () => { Sound.sfx('pop'); FX.burst(c.getBoundingClientRect().left + c.offsetWidth / 2, c.getBoundingClientRect().top + c.offsetHeight / 2, 30); S.visited.add(key); resolve(it); };
   }
   const cards = [...wrap.querySelectorAll('.hubCard')], mid = (cards.length - 1) / 2;
@@ -751,7 +781,7 @@ async function hubScreen(first) {
       onComplete: () => gsap.to(c, { y: `+=${1.2 * VH()}`, duration: 1.8 + k * .17, yoyo: true, repeat: -1, ease: 'sine.inOut' }) });
     c.addEventListener('pointerdown', () => gsap.to(c, { rotationX: 10, scale: .95, duration: .15 }));
   });
-  aside(first ? 'h01' : 'h02', { pose: first ? 'wave' : 'point' });
+  aside(first ? (S.hubLine || 'h03') : 'h02', { pose: first ? 'wave' : 'point' });
   const it = await chosen; asideToken++; hideBubble();
   return it;
 }
@@ -834,8 +864,9 @@ function openZoom(list, idx, caption) {
   gsap.fromTo(z, { opacity: 0 }, { opacity: 1, duration: .25 });
   show(1);
 }
+function clearNew(obj) { if (obj && obj.isNew) { obj.isNew = false; DB.put('kv', 'lib', S.lib); } }
 async function chapterScene(ch, i) {
-  const lineId = 'c' + (i + 1);
+  const lineId = 'c' + (i + 1); clearNew(ch);
   await albumScene({ bg: CH_BG[Math.min(i, CH_BG.length - 1)], title: ch.title || `${i + 1}번째 이야기`, photos: ch.photos, caption: ch.title,
     intro: { id: lineId, text: ch.memo || L[lineId] || L.cN, voice: ch.memo ? `c${i + 1}_memo` : lineId, pose: 'point' }, sceneKey: 'ch' + i });
 }
@@ -999,6 +1030,7 @@ async function placeScene(place, backLabel) {
     album = await chosen; asideToken++; hideBubble();
     if (!album) return;
   }
+  const wasNew = album.isNew; clearNew(album); album = { ...album, isNew: wasNew };
   const cap = (album.year ? album.year + '년 ' : '') + place.name;
   await albumScene({ bg: 'night', shade: '', title: cap, photos: album.photos, caption: cap, backLabel,
     intro: album.memo ? { id: 'memo', text: album.memo, voice: `memo_${place.name}_${album.year}`, pose: 'wave' }
@@ -1090,10 +1122,36 @@ async function epilogue() {
 /* =============================================================
    전체 진행
    ============================================================= */
+/* 두 번째 방문부터: 짧은 인사(돌려 가며) → 바로 추억 상자 */
+async function greeting(v) {
+  clearStage(); setBg('night'); FX.snow = .8;
+  Elf.place(1.05, 0.1); Elf.setPose('fly'); Elf.show();
+  await pause(500);
+  await Elf.fly(0.4, 0.3, { dur: 2.6, end: 'wave' });
+  FX.burst(innerWidth * .5, innerHeight * .4, 40); Sound.sfx('sparkle');
+  const now = new Date(), h = now.getHours(), md = (now.getMonth() + 1) * 100 + now.getDate();
+  const gap = v.last ? Math.floor((Date.now() - v.last) / 86400000) : 0;
+  let id;
+  if (S.lib.announceNew) { id = 'hiNew'; S.lib.announceNew = false; DB.put('kv', 'lib', S.lib); }
+  else if (md === 1224 || md === 1225) id = 'hiX';
+  else if (gap >= 3) id = 'hiGap';
+  else {
+    const timeLine = h >= 5 && h < 11 ? 'hiM' : h >= 11 && h < 18 ? 'hiA' : 'hiE';
+    const pool = ['hi1', 'hi2', 'hi3', 'hi4', timeLine].filter(x => x !== v.lastGreet);
+    id = pool[Math.floor(rand(0, pool.length))];
+  }
+  v.lastGreet = id;
+  await say(id, { pose: id === 'hiNew' || id === 'hiGap' ? 'surprise' : 'wave' });
+}
 async function run(from = 'start') {
   if (S.running) return; S.running = true; S.giftsFound = 0; S.giftsTotal = 0;
   try {
-    if (from === 'start') await prologue();
+    const v = (await DB.get('kv', 'visits')) || { count: 0, last: 0, lastGreet: '' };
+    const md = (() => { const d = new Date(); return (d.getMonth() + 1) * 100 + d.getDate(); })();
+    const xmasFirst = (md === 1224 || md === 1225) && new Date(v.last || 0).toDateString() !== new Date().toDateString();
+    if (from === 'prologue' || (from === 'start' && (v.count === 0 || xmasFirst))) { await prologue(); S.hubLine = 'h01'; }
+    else if (from === 'start') { await greeting(v); S.hubLine = 'h03'; }
+    v.count++; v.last = Date.now(); DB.put('kv', 'visits', v);
     if (S.daysTotal === undefined) { const [y, m, d] = S.settings.birth.split('-').map(Number); S.daysTotal = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(y, m - 1, d)) / 86400000); }
     await hub();
   } catch (e) { console.error(e); location.reload(); }
@@ -1102,24 +1160,38 @@ async function run(from = 'start') {
 /* =============================================================
    화면 구성 · 설정
    ============================================================= */
-function openSetup(canCancel) {
+let setupMode = 'full';
+function openSetup(canCancel, mode = 'full') {
+  setupMode = mode;
   $('setupLayer').classList.remove('hidden');
   $('cancelSetup').classList.toggle('hidden', !canCancel);
+  const add = mode === 'add';
+  $('setupTitle').innerHTML = add ? '사진 추가하기 <small>(지금 사진은 그대로)</small>' : '처음 설정 <small>(부모님용)</small>';
+  $('setupNote').textContent = add ? '새로 다녀온 여행이나 새 사진만 같은 폴더 구조로 압축해서 고르세요. 이미 있는 사진은 자동으로 건너뜁니다.'
+                                   : '입력한 이름·생일·사진은 이 태블릿 안에만 저장됩니다. 사진을 고르면 지금 있는 사진은 모두 새것으로 바뀝니다.';
+  document.querySelectorAll('.nameRow').forEach(e => e.classList.toggle('hidden', add));
+  $('saveBtn').textContent = add ? '추가하기' : '저장하고 시작하기';
+  $('inZip').value = '';
   if (S.settings) { $('inName').value = S.settings.name; $('inBirth').value = S.settings.birth; }
 }
 async function saveSetup() {
   const name = $('inName').value.trim(), birth = $('inBirth').value, files = $('inZip').files, file = files.length ? files : null;
   const rep = $('importReport');
-  if (!name || !birth) { rep.innerHTML = '<span class="warn">이름과 생일을 입력해 주세요.</span>'; return; }
+  const add = setupMode === 'add';
+  if (add && !file) { rep.innerHTML = '<span class="warn">추가할 사진 압축 파일(ZIP)을 선택해 주세요.</span>'; return; }
+  if (!add && (!name || !birth)) { rep.innerHTML = '<span class="warn">이름과 생일을 입력해 주세요.</span>'; return; }
   if (!file && !S.lib) { rep.innerHTML = '<span class="warn">사진 압축 파일(ZIP)을 선택해 주세요.</span>'; return; }
   $('saveBtn').disabled = true;
   try {
-    S.settings = { name, birth }; await DB.put('kv', 'settings', S.settings);
+    if (!add) { S.settings = { name, birth }; await DB.put('kv', 'settings', S.settings); }
     if (file) {
       $('progress').classList.remove('hidden');
-      const lib = await importZip(file, (i, n, f, fn) => { $('progBar').style.width = (i / n * 100) + '%'; $('progText').textContent = `${fn > 1 ? `압축 파일 ${f}/${fn} · ` : ''}사진 정리 중… ${i} / ${n}`; });
+      const lib = await importZip(file, (i, n, f, fn) => { $('progBar').style.width = (i / n * 100) + '%'; $('progText').textContent = `${fn > 1 ? `압축 파일 ${f}/${fn} · ` : ''}사진 정리 중… ${i} / ${n}`; }, { merge: add });
       S.lib = lib;
-      const lines = [`✔ 사진 ${lib.photos}장을 불러왔습니다.`,
+      const la = lib.lastAdd || { photos: 0, dup: 0, albums: [] };
+      const lines = [add ? `✔ 새 사진 ${la.photos}장을 추가했습니다. (전체 ${lib.photos}장)` : `✔ 사진 ${lib.photos}장을 불러왔습니다.`,
+        ...(add && la.albums.length ? [`· 새로 생긴/늘어난 곳: ${la.albums.join(', ')}`] : []),
+        ...(add && la.dup ? [`· 이미 있던 사진 ${la.dup}장은 건너뛰었습니다.`] : []),
         `· 장: ${lib.chapters.map(c => c.title || c.order).join(', ') || '없음'}`,
         `· 여행지: ${lib.places.map(p => p.name + '(' + p.albums.length + ')').join(', ') || '없음'}`,
         `· 표정: ${Object.keys(lib.expressions).map(n => n + (lib.cutouts && lib.cutouts[n] ? '(오린 사진)' : '')).join(', ') || '없음'}`,
@@ -1166,7 +1238,10 @@ function bindUi() {
     const now = Date.now(); taps = taps.filter(t => now - t < 2500); taps.push(now); if (taps.length >= 5) openParent(); });
   g.addEventListener('pointerup', () => { clearTimeout(hold); g.classList.remove('holding'); });
   $('pmClose').onclick = () => $('parentLayer').classList.add('hidden');
-  $('pmSetup').onclick = () => { $('parentLayer').classList.add('hidden'); $('startLayer').classList.add('hidden'); $('importReport').innerHTML = ''; $('progress').classList.add('hidden'); openSetup(true); };
+  const openFrom = mode => { $('parentLayer').classList.add('hidden'); $('startLayer').classList.add('hidden'); $('importReport').innerHTML = ''; $('progress').classList.add('hidden'); openSetup(true, mode); };
+  $('pmAdd').onclick = () => openFrom('add');
+  $('pmSetup').onclick = () => openFrom('full');
+  $('pmPrologue').onclick = () => { $('parentLayer').classList.add('hidden'); $('startLayer').classList.add('hidden'); Sound.unlock(); Sound.startBgm(); run('prologue'); };
   $('pmRestart').onclick = () => location.reload();
   $('pmJump').onclick = () => { $('parentLayer').classList.add('hidden'); $('startLayer').classList.add('hidden'); Sound.unlock(); Sound.startBgm(); run('hub'); };
 }
